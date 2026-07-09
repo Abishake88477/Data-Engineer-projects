@@ -1,0 +1,56 @@
+# source_config.yaml
+# Central config describing every source that feeds the Clearsprings pipeline.
+# Consumed by the ingestion notebooks (01, 02, 03) — kept out of code so new
+# sources can be onboarded without touching PySpark logic.
+
+adls:
+  base:  "abfss://bronze@clearsprings.dfs.core.windows.net"
+  sources:
+    - name: tenant_change_requests
+      path: "${base}/tenant_change_requests/date=*"
+      target: lakehouse.silver.tenant_change_requests
+      key_cols: [change_request_id]
+    - name: document_uploads
+      path: "${base}/document_uploads/date=*"
+      target: lakehouse.silver.document_uploads
+      key_cols: [document_id]
+    - name: property_updates
+      path: "${base}/property_updates/date=*"
+      target: lakehouse.silver.property_updates
+      key_cols: [property_id, update_ts]
+    - name: operational_history
+      path: "${base}/operational_history/date=*"
+      target: lakehouse.silver.operational_history
+      key_cols: [event_id]
+
+snowflake:
+  connection_secret_scope: kv-clearsprings
+  warehouse: COMPUTE_WH
+  role: DATA_ENGINEER
+  sources:
+    - {db: PROPERTY_DB,   schema: CORE, table: PROPERTY_DETAILS,       target: lakehouse.silver.property_details}
+    - {db: TENANCY_DB,    schema: CORE, table: TENANCY_RECORDS,        target: lakehouse.silver.tenancy_records}
+    - {db: REPAIR_DB,     schema: CORE, table: REPAIR_HISTORY,         target: lakehouse.silver.repair_history}
+    - {db: CONTRACTOR_DB, schema: CORE, table: CONTRACTOR_INFO,        target: lakehouse.silver.contractor_info}
+    - {db: COMPLIANCE_DB, schema: CORE, table: COMPLIANCE_RECORDS,     target: lakehouse.silver.compliance_records}
+    - {db: FINANCE_DB,    schema: CORE, table: FINANCIAL_TRANSACTIONS, target: lakehouse.silver.financial_transactions}
+
+web_apis:
+  base: "https://api.clearsprings.internal"
+  auth_secret_scope: kv-clearsprings
+  auth_secret_key: api-bearer-token
+  sources:
+    - {name: tenants,              path: /tenants,               target: lakehouse.silver.tenants_api,               key: [tenant_id]}
+    - {name: occupancy,            path: /occupancy,             target: lakehouse.silver.occupancy_api,             key: [property_id, as_of_date]}
+    - {name: maintenance_requests, path: /maintenance/requests,  target: lakehouse.silver.maintenance_requests_api,  key: [request_id]}
+    - {name: contractor_status,    path: /contractors/status,    target: lakehouse.silver.contractor_status_api,     key: [contractor_id]}
+
+gold_datasets:
+  - {name: property_360,      table: lakehouse.gold.property_360,      consumers: [BI, PropertyManagement]}
+  - {name: maintenance_ops,   table: lakehouse.gold.maintenance_ops,   consumers: [MaintenanceRepairs]}
+  - {name: compliance_audit,  table: lakehouse.gold.compliance_audit,  consumers: [ComplianceAudit]}
+  - {name: housing_support,   table: lakehouse.gold.housing_support,   consumers: [HousingSupport]}
+
+schedule:
+  cron: "0 9 * * *"     # every day
+  timezone: "US/Eastern"

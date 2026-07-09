@@ -1,0 +1,77 @@
+{
+  "name": "pl_clearsprings_daily_9am_et",
+  "properties": {
+    "description": "Daily Clearsprings Ready Homes ETL — orchestrates 3 Silver ingest notebooks and 1 Master Silver→Gold notebook. Scheduled 09:00 AM Eastern Time.",
+    "activities": [
+      {
+        "name": "act_ingest_adls_to_silver",
+        "type": "DatabricksNotebook",
+        "typeProperties": {
+          "notebookPath": "/Repos/data-eng/clearsprings/notebooks/01_ingest_adls_to_silver"
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks_clearsprings",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "act_ingest_snowflake_to_silver",
+        "type": "DatabricksNotebook",
+        "typeProperties": {
+          "notebookPath": "/Repos/data-eng/clearsprings/notebooks/02_ingest_snowflake_to_silver"
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks_clearsprings",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "act_ingest_webapi_to_silver",
+        "type": "DatabricksNotebook",
+        "typeProperties": {
+          "notebookPath": "/Repos/data-eng/clearsprings/notebooks/03_ingest_webapi_to_silver"
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks_clearsprings",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "act_master_silver_to_gold",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          { "activity": "act_ingest_adls_to_silver",      "dependencyConditions": ["Succeeded"] },
+          { "activity": "act_ingest_snowflake_to_silver", "dependencyConditions": ["Succeeded"] },
+          { "activity": "act_ingest_webapi_to_silver",    "dependencyConditions": ["Succeeded"] }
+        ],
+        "typeProperties": {
+          "notebookPath": "/Repos/data-eng/clearsprings/notebooks/04_master_silver_to_gold"
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks_clearsprings",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  },
+  "triggers": [
+    {
+      "name": "trg_clearsprings_daily_9am_et",
+      "properties": {
+        "type": "ScheduleTrigger",
+        "typeProperties": {
+          "recurrence": {
+            "frequency": "Day",
+            "interval": 1,
+            "startTime": "2024-06-01T09:00:00",
+            "timeZone": "Eastern Standard Time",
+            "schedule": { "hours": [9], "minutes": [0] }
+          }
+        },
+        "pipelines": [
+          { "pipelineReference": { "referenceName": "pl_clearsprings_daily_9am_et", "type": "PipelineReference" } }
+        ]
+      }
+    }
+  ]
+}
